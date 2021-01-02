@@ -22,10 +22,10 @@ print_names([H|T]) ->
     H ! {name},
     print_names(T).
 
-main(Threads) ->
-    io:fwrite("funkcja main~ngenerowanie ~p procesow...~n", [Threads]),
+main(N) ->
+    io:fwrite("funkcja main~ngenerowanie ~p procesow...~n", [N]),
     
-    Pids = spawn_threads(Threads),
+    Pids = spawn_threads(N),
     io:fwrite("Pids:~n~p~n", [Pids]),
 
     print_names(Pids),
