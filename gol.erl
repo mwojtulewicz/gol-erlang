@@ -10,6 +10,16 @@ main(X, Y) ->
     PIDs = start_processes(World),
     loop(World, X, Y, PIDs, 0).
 
+main(Filename) ->
+    case file:open(Filename, [read]) of
+        {ok, File} -> 
+            {X, Y, World} = parse_file(File),
+            file:close(File),
+            PIDs = start_processes(World),
+            loop(World, X, Y, PIDs, 0);
+        {error, _} -> io:format("file error")
+    end.
+
 % random world cell
 random_state() ->
     case rand:uniform(2) of
@@ -180,3 +190,41 @@ print({help}) ->
 restart - start a new symulation
 stop - terminate
 help - show this message\n", []).
+
+
+% reading file
+
+parse_file(File) ->
+    X = read_size(File),
+    Y = read_size(File),
+    World = read_world(File, 1, []),
+    {X, Y, World}.
+
+read_size(File) ->
+    {ok, Line} = file:read_line(File),
+    Number = string:trim(Line),
+    case string:to_integer(Number) of 
+        {error, _Error} ->
+            throw(parsing_error);
+        {Num, _Rest} ->
+            Num
+    end.
+
+read_world(File, Curr_X, World) ->
+    case file:read_line(File) of
+        eof -> 
+            World;
+        {error, _} ->
+            throw(reading_error);
+        {ok, Line} ->
+            Cells = string:tokens(Line, " "),
+            Row = read_row(Cells, Curr_X, 1, []),
+            read_world(File, Curr_X+1, World ++ Row)
+    end.
+
+read_row([], _, _, Row) -> Row;
+read_row([H | T], Curr_X, Curr_Y, Row) ->
+    case string:trim(H) of 
+        "x" -> read_row(T, Curr_X, Curr_Y+1, [{Curr_Y, Curr_X, alive} | Row]);
+        _ -> read_row(T, Curr_X, Curr_Y+1, [{Curr_Y, Curr_X, dead} | Row])
+    end.
