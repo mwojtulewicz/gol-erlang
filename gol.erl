@@ -34,6 +34,9 @@ loop(World, World_X, World_Y, PIDs, Generation) ->
             "stop" ->
                 stop_processes(World, PIDs),
                 exit;
+            "restart" ->
+                New_World = [{XX, YY, random_state()} || XX <- lists:seq(1, World_X), YY <- lists:seq(1, World_Y)],
+                loop(New_World, World_X, World_Y, PIDs, 0);
             [] ->
                 New_World = next_generation(World, PIDs),
                 loop(New_World, World_X, World_Y, PIDs, Generation+1);
@@ -166,10 +169,14 @@ Rules:
 Generation: ~p", [0, 0, X, Y, Generation]), 13;
 
 print({foot}) ->
-    io:format("hit Enter to see next Generation\ntype 'help' for help, 'stop' to exit\n");
+    io:format(
+"hit Enter to see next Generation
+type 'restart' to start a new symulation
+type 'help' for help, 'stop' to exit\n");
 
 print({help}) ->
     io:format(
-"\\n - new generation 
-stop - terminate, 
-help - shows this message\n", []).
+"\\n - new generation (hit Enter)
+restart - start a new symulation
+stop - terminate
+help - show this message\n", []).
