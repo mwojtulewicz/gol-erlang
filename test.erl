@@ -33,3 +33,6 @@ main(N) ->
     print_names(Pids),
 
     io:fwrite("koniec funkcji main.~n").
+
+main2() ->
+    io:format("\033[~p;~pHnapisalem cos w calkiem dziwnym miejscu!", [10,20]).
