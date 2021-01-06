@@ -1,4 +1,4 @@
--module(gol).
+-module(gol_vsc).
 -compile([export_all]).
 
 
@@ -31,8 +31,8 @@ random_state() ->
 % symulation loop
 loop(World, World_X, World_Y, PIDs, Generation) ->
     print({clear}),
-    _Offset = print({header, Generation, World_X, World_Y}),
-    show_world(World, World_X),
+    Offset = print({header, Generation, World_X, World_Y}),
+    print_world(World, World_Y, Offset),
     print({foot}),
 
     % loop function, interactive interface
@@ -144,47 +144,28 @@ rules(State, Nhood) ->
 
 % printing and formatting
 
-show_world(World, World_X) ->
-    Sort = fun({X1,Y1,_}, {X2,Y2,_}) ->
-        if 
-            X1 < X2 ->
-                true;
-            X1 == X2 ->
-                if 
-                    Y1 < Y2 ->
-                        true;
-                    Y1 > Y2 ->
-                        false
-                end;
-            X1 > X2 ->
-                false
-        end
-    end,
-    S_World = lists:usort(Sort, World),
-    print_world(S_World, World_X).
+print_world([Cell], World_Y, Offset) ->
+    print({Cell, Offset}),
+    io:format("\n"),
+    io:format("\033[~p;~pH", [World_Y+Offset+2, 0]);
 
-print_world([], _) -> io:format("\n");
-print_world(World, World_X) ->
-    {Row, Rest} = lists:split(World_X, World),
-    print_row(Row),
-    print_world(Rest, World_X).
+print_world([Cell | T], World_Y, Offset) ->
+    print({Cell, Offset}),
+    print_world(T, World_Y, Offset).
 
-print_row([]) -> io:format("\n");
-print_row([{_,_,State} | Rest]) ->
-    case State of 
-        alive ->
-            io:format("X ");
-        dead ->
-            io:format("- ")
-    end,
-    print_row(Rest).
+print({{X,Y,State}, Offset}) ->
+    io:format("\033[~p;~pH", [Y+Offset, X*2]),
+    case State of
+        alive -> io:format("X");
+        dead -> io:format("-")
+    end;
 
 print({clear}) ->
-    io:format("\n\n-------------------------------------------------------------------------\n\n");
+    io:format("\033[2J", []);
 
 print({header, Generation, X, Y}) ->
     io:format(
-"Conway\'s Game of Life
+"\033[~p;~pHConway\'s Game of Life
 
 World size: (~p, ~p)
 X -> alive cell
@@ -195,19 +176,17 @@ Rules:
     2. Any dead cell with three live neighbours becomes a live cell.
     3. All other live cells die in the next generation. Similarly, all other dead cells stay dead.
 
-Generation: ~p \n\n", [X, Y, Generation]);
+Generation: ~p", [0, 0, X, Y, Generation]), 13;
 
 print({foot}) ->
     io:format(
-"hit Enter to see the next Generation \n
-type:
- 'restart' to start a new symulation
- 'help' for help
- 'stop' to exit\n\n");
+"hit Enter to see next Generation
+type 'restart' to start a new symulation
+type 'help' for help, 'stop' to exit\n");
 
 print({help}) ->
     io:format(
-"\\n - next generation (hit Enter)
+"\\n - new generation (hit Enter)
 restart - start a new symulation
 stop - terminate
 help - show this message\n", []).

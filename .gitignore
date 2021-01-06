@@ -1,3 +1,4 @@
 .vscode/
 *.beam
 *.dump
+gol[1-9].erl
