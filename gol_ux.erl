@@ -180,13 +180,15 @@ Generation: ~p", [0, 0, X, Y, Generation]), 13;
 
 print({foot}) ->
     io:format(
-"hit Enter to see next Generation
-type 'restart' to start a new symulation
-type 'help' for help, 'stop' to exit\n");
+"hit Enter to see the next Generation \n
+type:
+ 'restart' to start a new symulation
+ 'help' for help
+ 'stop' to exit\n\n");
 
 print({help}) ->
     io:format(
-"\\n - new generation (hit Enter)
+"\\n - next generation (hit Enter)
 restart - start a new symulation
 stop - terminate
 help - show this message\n", []).
