@@ -1,4 +1,4 @@
--module(gol_vsc).
+-module(gol_ux).
 -compile([export_all]).
 
 
