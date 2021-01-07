@@ -1,16 +1,30 @@
+% Gabriela Matuszewska, Mateusz Wojtulewicz
+% Game Of Life w Erlangu
+% pwir 2020/21
+
 -module(gol).
 -compile([export_all]).
 
+% ----- OPIS -----
+% swiat w symulacji ma dwie wielkosci: szerokosc (X), dlugosc (Y)
+% swiat sklada sie z listy X*Y komorek
+% komorka to krotka postaci {X, Y, State}, gdzie X,Y to jej wspolrzedne a State to jej aktualny stan
+% sa dwa mozliwe stany komorki: zywy (alive), martwy (dead)
+% nowa generacja swiata zalezy od poprzedniej - ewolucja przebiega wedlug okreslonych zasad
+% nowy stan komorki zalezy od jej stanu i stanu jej sasiedztwa
+% zrownoleglenie obliczen wystepuje przy okreslaniu nowej generacji swiata
+% procesow rownoleglych jest tyle ile komorek - 1 proces jest odpowiedzialny za obliczenie nastepnego stanu 1 komorki w symulacji
 
-% X - x world length
-% Y - y world length
-% one World's cell is a tuple of form {X, Y, State}, where X, Y are cells coordinates and State is its state (either dead or alive)
+
+% 2 mozliwe funkcje glowne
+
+% generujaca losowy swiat o podanej wielkosci
 main(X, Y) ->
     World = [{XX, YY, random_state()} || XX <- lists:seq(1, X), YY <- lists:seq(1, Y)],
-    % World = [[{random_state()} || _ <- lists:seq(1, X)] || _ <- lists:seq(1, Y)],
     PIDs = start_processes(World),
     loop(World, X, Y, PIDs, 0).
 
+% swiat generowany na podstawie odpowiednio przygotowanego pliku
 main(Filename) ->
     case file:open(Filename, [read]) of
         {ok, File} -> 
@@ -21,21 +35,25 @@ main(Filename) ->
         {error, _} -> io:format("file error")
     end.
 
-% random world cell
+% funkcja do losowego inicjalizowania stanu komorki z dwoch dostepnych (zywa, martwa)
 random_state() ->
     case rand:uniform(2) of
         1 -> dead;
         2 -> alive
     end.
 
-% symulation loop
+% glowna petla symulacji
+% wprowadza interfejs pseudograficzny
 loop(World, World_X, World_Y, PIDs, Generation) ->
+    % wyswietlanie informacji o symulacji
     print({clear}),
-    _Offset = print({header, Generation, World_X, World_Y}),
+    print({header, Generation, World_X, World_Y}),
+    % wyswietlanie swiata w aktualnej generacji
     show_world(World, World_X),
     print({foot}),
 
-    % loop function, interactive interface
+    % funkcja tworzaca interfejs pseudograficzny
+    % pozwala uzytkownikowi na wprowadzenie komendy, ktora przetwarza
     Input_loop = fun(Input_loop_fun) ->
         Input = io:get_line(">> "),
         case string:trim(Input) of
@@ -46,46 +64,53 @@ loop(World, World_X, World_Y, PIDs, Generation) ->
                 stop_processes(PIDs),
                 exit;
             "restart" ->
-                New_World = [{XX, YY, random_state()} || XX <- lists:seq(1, World_X), YY <- lists:seq(1, World_Y)],
-                loop(New_World, World_X, World_Y, PIDs, 0);
+                main(World_X, World_Y);
+            "load" ->
+                Filename = io:get_line(">> File: "),
+                main(string:trim(Filename));
             [] ->
+                % wcisniecie Enter
+                % obliczenie nowej generacji symulacji
                 New_World = next_generation(World, PIDs),
+                % petla
                 loop(New_World, World_X, World_Y, PIDs, Generation+1);
             _ ->
                 io:format("Unknown command\n"),
                 Input_loop_fun(Input_loop_fun)
             end
         end,
+    % wywolanie tejze fukcji -> pseudo-petla
     Input_loop(Input_loop).
 
-% redistributing calculations and receiving results
+% funkcja rozdzielajaca zadania na procesy i zbierajaca wyniki
 next_generation(World, PIDs) ->
     send_jobs(World, PIDs),
     receive_cell_jobs(length(World), []).
 
 
-% process management
-% new cells' states are calculated in separated processes - one for each cell
+% zarzadzanie procesami
 
-% start processes
-% sending main thread PID as an argument
+% stworzenie po jednym procesie na kazda komorke
+% PID procesow zwracane sa jako lista
 start_processes(World) ->
     lists:foldl(
         fun(_, Workers) ->
             [spawn(?MODULE, cell_job, [self()]) | Workers]
         end, [], World).
 
-% terminate processes by sending them {stop} message
+% zatrzymywanie procesow poprzez wyslanie im odpowiedniej wiadomosci
 stop_processes(PIDs) -> 
     lists:map(fun(PID) -> PID!{stop} end, PIDs).
 
-% sending cells to processes 
+% funkcja przesylajaca do procesow po jednej komorce oraz kopie swiata 
 send_jobs(World, PIDs) ->
     Zipped = lists:zip(World, PIDs),
     lists:map(fun({Elem, PID}) -> PID!{Elem, World} end, Zipped).
 
-% collecting calculated cell states
-% waiting for that many messages as there are cells in the World
+% funkcja zbierajaca obliczone stany komorek
+% uruchamiana w glownym procesie
+% procesy obliczajace nowe stany komorek odsylaja wyniki na PID glownego procesu
+% dzieki argumentowi Max_Length funckja zwraca swiat dopiero po dodaniu do niego wszystkich komorek otrzymanych w wiadomosciach
 receive_cell_jobs(Max_length, New_World) ->
     receive
         Field ->
@@ -95,8 +120,10 @@ receive_cell_jobs(Max_length, New_World) ->
             end
     end.
 
-% job that is calculating cells neighbourhood and new state
-% those are the most calculationally demanding operations - thus we can compute them in parallel to save time
+% funkcje zadania uruchomione w procesach, przechowuja PID glownego procesu
+% otrzymuja wiadomosc zawierajaca komorke (krotka) i kopie swiata
+% wykonuja najbardziej zlozone obliczeniowo operacje, czyli znajdywanie sasiedztwa 3x3 i obliczanie nowego stanu komorki
+% wynik wysylaja z powrotem do glownego procesu gdzie sa zlaczane w nowy swiat
 cell_job(PID) ->
     receive
         {{X, Y, State}, World} ->
@@ -107,12 +134,13 @@ cell_job(PID) ->
     end.
 
 
-% rules and logic
-% 1. Any live cell with two or three live neighbours survives.
-% 2. Any dead cell with three live neighbours becomes a live cell.
-% 3. All other live cells die in the next generation. Similarly, all other dead cells stay dead.
+% zasady i logika
+% 1. kazda zywa komorka z 2 lub 3 zywymi sasiadami pozostaje zywa
+% 2. kazda martwa komorka z dokladnie 3 zywymi sasiadami staje sie komorka zywa
+% 3. wszystkie pozostale komorki nie zmieniaja swojego stanu
 
-% finding 8 neighbours for a cell
+% fznajdywanie sasiedztwa komorki
+% dzieki uzyciu funkcji lists:any dla komorek na krawedziach zostanie zwrocona mniejsza ilosc komorek 
 nhood(Xin, Yin, World) ->
     Indices = lists:delete({Xin,Yin}, [{Xin+I, Yin+J} || I <- [-1,0,1], J <- [-1,0,1]]),
     lists:filter(
@@ -121,7 +149,7 @@ nhood(Xin, Yin, World) ->
         end,
         World).
 
-% updating cell state based on rules given the cell's neighbourhood
+% aktualizowanie stanu komorki na podstawie jej siasiedztwa i wlasnego stanu
 rules(State, Nhood) ->
     Alive_neigh = length(lists:filter(fun({_,_,S}) -> S == alive end, Nhood)),
     case State of
@@ -142,8 +170,11 @@ rules(State, Nhood) ->
     end.
 
 
-% printing and formatting
+% wyswietlanie i wypisywanie
 
+% funkcja do wyswietlania stanu swiata symulacji
+% sortkuje swiat korzystajac z wspolrzednych komorek
+% przesyla przesortowana liste do funkcji pomocniczej
 show_world(World, World_X) ->
     Sort = fun({X1,Y1,_}, {X2,Y2,_}) ->
         if 
@@ -163,12 +194,15 @@ show_world(World, World_X) ->
     S_World = lists:usort(Sort, World),
     print_world(S_World, World_X).
 
+% funkcja rekurejcyjna wypisujaca komorki ulozone w posortowanej liscie
+% oddziela jeden rzad i przesyla go do funkcji pomocniczej
 print_world([], _) -> io:format("\n");
 print_world(World, World_X) ->
     {Row, Rest} = lists:split(World_X, World),
     print_row(Row),
     print_world(Rest, World_X).
 
+% funkcja rekurencyjna wypisujaca jeden wiersz swiata
 print_row([]) -> io:format("\n");
 print_row([{_,_,State} | Rest]) ->
     case State of 
@@ -178,6 +212,9 @@ print_row([{_,_,State} | Rest]) ->
             io:format("- ")
     end,
     print_row(Rest).
+
+
+% funkcje odpowiedzialne za wypisywanie potrzebnych informacji w pseudo gui
 
 print({clear}) ->
     io:format("\n\n-------------------------------------------------------------------------\n\n");
@@ -201,26 +238,35 @@ print({foot}) ->
     io:format(
 "hit Enter to see the next Generation \n
 type:
- 'restart' to start a new symulation
+ 'restart' to start a new symulation with random world state
+ 'load' to load a world state from file
  'help' for help
  'stop' to exit\n\n");
 
 print({help}) ->
     io:format(
 "\\n - next generation (hit Enter)
-restart - start a new symulation
+restart - start a new symulation 
+load - start a new symulation from file (given next)
 stop - terminate
 help - show this message\n", []).
 
 
-% reading file
+% odczytywanie i parsowanie pliku
 
+% plik musi byc odpowiednio przygotowany
+% pierwsze dwie linijki to odpowiednio szerokosc i dlugosc swiata
+% kolejne linijki to oddzielone spacjami odpowiednia ilosc symboli, gdzie x oznacza komorke zywa
+% przyklad pliku: plik glider
+
+% glowna funkcja parsujaca
 parse_file(File) ->
     X = read_size(File),
     Y = read_size(File),
     World = read_world(File, 1, []),
     {X, Y, World}.
 
+% funkcja odpowiedzialna za wyczytanie z jednej linijki szerokosci lub dlugosci swiata, uzywana dwukrotnie
 read_size(File) ->
     {ok, Line} = file:read_line(File),
     Number = string:trim(Line),
@@ -231,6 +277,8 @@ read_size(File) ->
             Num
     end.
 
+% funkcja rekurencyjna do parsowania przygotowanych linijek
+% rozdziela jedna linijke (string) na liste obcinajac po spacjach
 read_world(File, Curr_X, World) ->
     case file:read_line(File) of
         eof -> 
@@ -243,6 +291,7 @@ read_world(File, Curr_X, World) ->
             read_world(File, Curr_X+1, World ++ Row)
     end.
 
+% funkcja pomocnicza do parsowania jednej linijki
 read_row([], _, _, Row) -> Row;
 read_row([H | T], Curr_X, Curr_Y, Row) ->
     case string:trim(H) of 
