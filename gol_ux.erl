@@ -46,8 +46,10 @@ loop(World, World_X, World_Y, PIDs, Generation) ->
                 stop_processes(PIDs),
                 exit;
             "restart" ->
-                New_World = [{XX, YY, random_state()} || XX <- lists:seq(1, World_X), YY <- lists:seq(1, World_Y)],
-                loop(New_World, World_X, World_Y, PIDs, 0);
+                main(World_X, World_Y);
+            "load" ->
+                Filename = io:get_line(">> File: "),
+                main(string:trim(Filename));
             [] ->
                 New_World = next_generation(World, PIDs),
                 loop(New_World, World_X, World_Y, PIDs, Generation+1);
@@ -182,14 +184,16 @@ print({foot}) ->
     io:format(
 "hit Enter to see the next Generation \n
 type:
- 'restart' to start a new symulation
+ 'restart' to start a new symulation with random world state
+ 'load' to load a world state from file
  'help' for help
  'stop' to exit\n\n");
 
 print({help}) ->
     io:format(
 "\\n - next generation (hit Enter)
-restart - start a new symulation
+restart - start a new symulation 
+load - start a new symulation from file (given next)
 stop - terminate
 help - show this message\n", []).
 
