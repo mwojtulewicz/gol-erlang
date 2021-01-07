@@ -217,7 +217,7 @@ print_row([{_,_,State} | Rest]) ->
 % funkcje odpowiedzialne za wypisywanie potrzebnych informacji w pseudo gui
 
 print({clear}) ->
-    io:format("\033[2J", []);
+    io:format("\n\n \033[2J \n\n", []);
 
 print({header, Generation, X, Y}) ->
     io:format(
