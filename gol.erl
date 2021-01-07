@@ -74,6 +74,10 @@ loop(World, World_X, World_Y, PIDs, Generation) ->
                 New_World = next_generation(World, PIDs),
                 % petla
                 loop(New_World, World_X, World_Y, PIDs, Generation+1);
+            "debug" ->
+                % komenda do sprawdzania poprawnosci wyswietlania
+                io:format("~p", [World]),
+                Input_loop_fun(Input_loop_fun);
             _ ->
                 io:format("Unknown command\n"),
                 Input_loop_fun(Input_loop_fun)
@@ -182,7 +186,7 @@ show_world(World, World_X) ->
                 true;
             X1 == X2 ->
                 if 
-                    Y1 < Y2 ->
+                    Y1 =< Y2 ->
                         true;
                     Y1 > Y2 ->
                         false
@@ -191,7 +195,7 @@ show_world(World, World_X) ->
                 false
         end
     end,
-    S_World = lists:usort(Sort, World),
+    S_World = lists:sort(Sort, World),
     print_world(S_World, World_X).
 
 % funkcja rekurejcyjna wypisujaca komorki ulozone w posortowanej liscie
@@ -295,6 +299,6 @@ read_world(File, Curr_X, World) ->
 read_row([], _, _, Row) -> Row;
 read_row([H | T], Curr_X, Curr_Y, Row) ->
     case string:trim(H) of 
-        "x" -> read_row(T, Curr_X, Curr_Y+1, [{Curr_Y, Curr_X, alive} | Row]);
-        _ -> read_row(T, Curr_X, Curr_Y+1, [{Curr_Y, Curr_X, dead} | Row])
+        "x" -> read_row(T, Curr_X, Curr_Y+1, [{Curr_X, Curr_Y, alive} | Row]);
+        _ -> read_row(T, Curr_X, Curr_Y+1, [{Curr_X, Curr_Y, dead} | Row])
     end.
